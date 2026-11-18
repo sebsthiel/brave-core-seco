@@ -171,6 +171,34 @@
     --iron-icon-fill-color: var(--google-grey-500);
   }
 
+  .addon-catalog-status {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-xl);
+    padding: var(--leo-spacing-xl) var(--leo-spacing-2xl);
+    margin-bottom: var(--leo-spacing-xl);
+    border-radius: var(--leo-radius-l);
+    background: var(--leo-color-container-highlight);
+  }
+
+  .addon-catalog-status-title {
+    font: var(--leo-font-default-semibold);
+    color: var(--leo-color-text-primary);
+  }
+
+  .addon-catalog-status-desc {
+    font: var(--leo-font-default-regular);
+    color: var(--leo-color-text-secondary);
+    margin-top: var(--leo-spacing-s);
+  }
+
+  .my-addons-row {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--leo-spacing-xl);
+  }
+
   #adblock-section .settings-box:first-child {
     border-top: transparent;
   }
@@ -242,15 +270,23 @@
         </div>
     </div>
   </div>
-  <!-- TODO: Placeholder section: Replace text with localized strings -->
+  <!-- TODO: Replace add-on catalog text with localized strings. -->
   <div class="settings-box">
     <div class="flex">
-      <div class="label shields-primary-title">Placeholder section</div>
+      <div class="label shields-primary-title">Add-on catalog</div>
       <div class="label secondary shields-secondary-title">
-        This is temporary text for the new section.
+        Add-ons made by other users, with filters and scriptlets.<br>
+        Opening the catalog contacts a server, which can see your IP address.<br>
+        The catalog is off until you turn it on.
       </div>
-      <div class="list-actions-box">
-        <cr-button on-click="handlePlaceholderClick_">Placeholder button</cr-button>
+      <div class="addon-catalog-status">
+        <div class="flex">
+          <div class="addon-catalog-status-title">Catalog is off.</div>
+          <div class="addon-catalog-status-desc">
+            Nothing has been sent to any server.
+          </div>
+        </div>
+        <leo-button on-click="handleTurnOnCatalog_">Turn on catalog</leo-button>
       </div>
     </div>
   </div>
@@ -372,6 +408,24 @@
       </div>
       <adblock-scriptlet-list>
       </adblock-scriptlet-list>
+    </div>
+  </div>
+</template>
+
+<!-- TODO: Replace my add-ons text with localized strings. -->
+<template is="dom-if" if="[[developerModePref_.value]]" restamp>
+  <div class="settings-box">
+    <div class="my-addons-row">
+      <div class="flex">
+        <div class="label shields-primary-title">My add-ons</div>
+        <div class="label secondary shields-secondary-title">
+          Publish your filters and scriptlets as an add-on for others to download.<br>
+          Turn on the catalog to publish.
+        </div>
+      </div>
+      <leo-button is-disabled on-click="handlePublishAddon_">
+        Publish new add-on
+      </leo-button>
     </div>
   </div>
 </template>

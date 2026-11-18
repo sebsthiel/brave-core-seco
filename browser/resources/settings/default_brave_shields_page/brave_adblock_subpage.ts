@@ -145,9 +145,14 @@ class AdBlockSubpage extends AdBlockSubpageBase {
       (customFilters.trim().length > 0 || devMode)
   }
 
-  private handlePlaceholderClick_() {
-    // TODO: Implement placeholder section action.
-    console.log('Placeholder button clicked')
+  private handleTurnOnCatalog_() {
+    // TODO: Implement turning on the add-on catalog.
+    console.log('Turn on catalog clicked')
+  }
+
+  private handlePublishAddon_() {
+    // TODO: Implement publishing an add-on.
+    console.log('Publish new add-on clicked')
   }
 
   private handleShowList_() {
