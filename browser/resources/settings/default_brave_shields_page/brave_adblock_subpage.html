@@ -1,4 +1,4 @@
-<style include="cr-shared-style settings-shared">
+<style include="cr-shared-style settings-shared md-select">
   :host {
     --selected-background-color: #F8F9FA;
     --table-header-background-color: #E9E9F4;
@@ -192,6 +192,109 @@
     margin-top: var(--leo-spacing-s);
   }
 
+  .addon-catalog-header {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-xl);
+  }
+
+  .addon-catalog-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+    font: var(--leo-font-default-semibold);
+    color: var(--leo-color-text-primary);
+    cursor: pointer;
+  }
+
+  .addon-catalog-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+    margin-bottom: var(--leo-spacing-xl);
+  }
+
+  .addon-catalog-search {
+    flex: 1 1 auto;
+  }
+
+  .addon-catalog-search-icon {
+    padding: 5px;
+  }
+
+  .addon-catalog-search-icon iron-icon {
+    --iron-icon-fill-color: var(--google-grey-500);
+  }
+
+  .addon-catalog-row {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1.6fr 1fr 1fr auto;
+    gap: var(--leo-spacing-m);
+    align-items: center;
+    padding: var(--leo-spacing-l) 0;
+    border-bottom: 1px solid var(--leo-color-divider-subtle);
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-text-primary);
+  }
+
+  .addon-catalog-row.header {
+    font: var(--leo-font-small-semibold);
+    color: var(--leo-color-text-secondary);
+  }
+
+  .addon-title {
+    font: var(--leo-font-default-semibold);
+  }
+
+  .addon-desc {
+    color: var(--leo-color-text-secondary);
+  }
+
+  .addon-needs-dev-mode {
+    font: var(--leo-font-x-small-semibold);
+    color: var(--leo-color-systemfeedback-warning-text);
+  }
+
+  .addon-needs-dev-mode a {
+    color: var(--leo-color-text-interactive);
+    text-decoration: none;
+  }
+
+  .addon-action {
+    justify-self: end;
+  }
+
+  .addon-catalog-footnote {
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-text-secondary);
+    margin: var(--leo-spacing-m) 0 var(--leo-spacing-xl);
+  }
+
+  cr-dialog [slot="title"] {
+    font: var(--leo-font-heading-h3);
+    color: var(--leo-color-text-primary);
+  }
+
+  .addon-catalog-dialog-body {
+    font: var(--leo-font-default-regular);
+    color: var(--leo-color-text-primary);
+  }
+
+  .addon-catalog-dialog-body ul {
+    padding-inline-start: var(--leo-spacing-xl);
+  }
+
+  .addon-catalog-dialog-buttons {
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--leo-spacing-m);
+  }
+
+  .addon-catalog-dialog-buttons leo-button {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
   .my-addons-row {
     display: flex;
     flex: 1 1 auto;
@@ -273,23 +376,140 @@
   <!-- TODO: Replace add-on catalog text with localized strings. -->
   <div class="settings-box">
     <div class="flex">
-      <div class="label shields-primary-title">Add-on catalog</div>
-      <div class="label secondary shields-secondary-title">
-        Add-ons made by other users, with filters and scriptlets.<br>
-        Opening the catalog contacts a server, which can see your IP address.<br>
-        The catalog is off until you turn it on.
-      </div>
-      <div class="addon-catalog-status">
-        <div class="flex">
-          <div class="addon-catalog-status-title">Catalog is off.</div>
-          <div class="addon-catalog-status-desc">
-            Nothing has been sent to any server.
-          </div>
+      <template is="dom-if" if="[[!catalogEnabled_]]" restamp>
+        <div class="label shields-primary-title">Add-on catalog</div>
+        <div class="label secondary shields-secondary-title">
+          Add-ons made by other users, with filters and scriptlets.<br>
+          Opening the catalog contacts a server, which can see your IP address.<br>
+          The catalog is off until you turn it on.
         </div>
-        <leo-button on-click="handleTurnOnCatalog_">Turn on catalog</leo-button>
-      </div>
+        <div class="addon-catalog-status">
+          <div class="flex">
+            <div class="addon-catalog-status-title">Catalog is off.</div>
+            <div class="addon-catalog-status-desc">
+              Nothing has been sent to any server.
+            </div>
+          </div>
+          <leo-button on-click="handleTurnOnCatalog_">Turn on catalog</leo-button>
+        </div>
+      </template>
+      <template is="dom-if" if="[[catalogEnabled_]]" restamp>
+        <div class="addon-catalog-header">
+          <div class="flex">
+            <div class="label shields-primary-title">Add-on catalog</div>
+            <div class="label secondary shields-secondary-title">
+              Add-ons made by other users. Open one to read its code before
+              downloading.
+            </div>
+          </div>
+          <label class="addon-catalog-toggle">
+            <span>Catalog is on</span>
+            <leo-toggle checked="[[catalogEnabled_]]"
+                on-change="handleCatalogToggle_">
+            </leo-toggle>
+          </label>
+        </div>
+        <div class="addon-catalog-filters">
+          <cr-input type="search" class="addon-catalog-search"
+              placeholder="Search by title, author or category"
+              value="[[catalogSearch_]]" on-input="onCatalogSearchInput_">
+            <span class="addon-catalog-search-icon" slot="inline-suffix">
+              <iron-icon icon="search"></iron-icon>
+            </span>
+          </cr-input>
+          <select class="md-select" aria-label="Category"
+              on-change="onCatalogCategoryChange_">
+            <option value="">Category: All</option>
+            <template is="dom-repeat"
+                items="[[getCatalogCategories_(catalogAddons_)]]">
+              <option value="[[item]]">[[item]]</option>
+            </template>
+          </select>
+        </div>
+        <div class="addon-catalog-table" role="table">
+          <div class="addon-catalog-row header" role="row">
+            <span role="columnheader">Title</span>
+            <span role="columnheader">Author</span>
+            <span role="columnheader">Category</span>
+            <span role="columnheader">Contains</span>
+            <span role="columnheader">Published</span>
+            <span role="columnheader">Updated</span>
+            <span role="columnheader"></span>
+          </div>
+          <template is="dom-repeat"
+              items="[[filterCatalogAddons_(catalogAddons_, catalogSearch_, catalogCategory_)]]">
+            <div class="addon-catalog-row" role="row">
+              <div role="cell">
+                <div class="addon-title">[[item.title]]</div>
+                <div class="addon-desc">[[item.description]]</div>
+              </div>
+              <span role="cell">[[item.author]]</span>
+              <span role="cell">[[item.category]]</span>
+              <div role="cell">
+                <div>[[getAddonContents_(item)]]</div>
+                <template is="dom-if"
+                    if="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]">
+                  <div class="addon-needs-dev-mode">
+                    Needs Developer mode ·
+                    <a href="#" on-click="handleTurnOnDeveloperMode_">Turn on</a>
+                  </div>
+                </template>
+              </div>
+              <span role="cell">[[item.published]]</span>
+              <span role="cell">[[item.updated]]</span>
+              <div role="cell" class="addon-action">
+                <leo-button size="small"
+                    isDisabled$="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]"
+                    on-click="handleDownloadAddon_">
+                  Download
+                </leo-button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="addon-catalog-footnote">
+          Add-ons with scriptlets can be downloaded only when Developer mode is
+          on. Rules-only add-ons do not need it.
+        </div>
+      </template>
     </div>
   </div>
+
+  <template is="dom-if" if="[[showCatalogDialog_]]" restamp>
+    <cr-dialog show-on-attach on-close="handleCatalogDialogCancel_">
+      <div slot="title">Turn on the add-on catalog?</div>
+      <div slot="body" class="addon-catalog-dialog-body">
+        <p>
+          Brave will connect to a catalog server to show add-ons made by other
+          users.
+        </p>
+        <ul>
+          <li>The server will see your internet address (IP address).</li>
+          <li>
+            Brave loads the whole catalog at once, so the server does not know
+            which add-on you look at.
+          </li>
+          <li>
+            Brave sends nothing about you: no filters, no scriptlets, no
+            browsing data.
+          </li>
+        </ul>
+        <p>
+          You can turn it off at any time. This stops future contact, but
+          add-ons you already downloaded stay on your device.
+        </p>
+      </div>
+      <div slot="button-container" class="addon-catalog-dialog-buttons">
+        <leo-button kind="outline" on-click="handleCatalogDialogCancel_">
+          Not now
+        </leo-button>
+        <leo-button on-click="handleCatalogDialogConfirm_">Turn on</leo-button>
+        <leo-button kind="plain" on-click="handleCatalogLearnMore_">
+          Learn more
+        </leo-button>
+      </div>
+    </cr-dialog>
+  </template>
   <div class="settings-box">
     <div class="flex">
       <div class="label shields-primary-title">
@@ -423,7 +643,8 @@
           Turn on the catalog to publish.
         </div>
       </div>
-      <leo-button is-disabled on-click="handlePublishAddon_">
+      <leo-button isDisabled$="[[!catalogEnabled_]]"
+          on-click="handlePublishAddon_">
         Publish new add-on
       </leo-button>
     </div>

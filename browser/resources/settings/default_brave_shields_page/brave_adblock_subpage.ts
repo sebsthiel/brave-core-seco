@@ -6,7 +6,10 @@
 import './components/brave_adblock_editor.js'
 import './components/brave_adblock_scriptlet_list.js'
 import './components/brave_adblock_subscribe_dropdown.js'
+import 'chrome://resources/cr_elements/cr_dialog/cr_dialog.js'
+import '//resources/cr_elements/md_select.css.js'
 
+import {PrefService} from '/shared/settings/prefs2/pref_service.js'
 import {PrefServiceObserverMixin} from '/shared/settings/prefs2/pref_service_observer_mixin.js'
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js'
 import type {
@@ -31,6 +34,53 @@ import {SettingsViewMixin} from '../settings_page/settings_view_mixin.js';
 import {getTemplate} from './brave_adblock_subpage.html.js'
 
 import {loadTimeData} from '../i18n_setup.js'
+
+const DEVELOPER_MODE_PREF = 'brave.ad_block.developer_mode'
+
+interface CatalogAddon {
+  title: string
+  description: string
+  author: string
+  category: string
+  rules: number
+  scriptlets: number
+  published: string
+  updated: string
+}
+
+// TODO: Fetch add-ons from the catalog database instead of placeholder data.
+const PLACEHOLDER_CATALOG_ADDONS: CatalogAddon[] = [
+  {
+    title: '[Add-on A]',
+    description: '[Short description]',
+    author: '@[nickname]',
+    category: 'Annoyances',
+    rules: 3,
+    scriptlets: 2,
+    published: '[date]',
+    updated: '[date]',
+  },
+  {
+    title: '[Add-on B]',
+    description: '[Short description]',
+    author: '@[nickname]',
+    category: 'Cookie notices',
+    rules: 12,
+    scriptlets: 0,
+    published: '[date]',
+    updated: '[date]',
+  },
+  {
+    title: '[Add-on C]',
+    description: '[Short description]',
+    author: '@[nickname]',
+    category: 'Ads',
+    rules: 0,
+    scriptlets: 4,
+    published: '[date]',
+    updated: '[date]',
+  },
+]
 
 const AdBlockSubpageBase = SettingsViewMixin(
   PrefServiceObserverMixin(I18nMixin(BaseMixin(PolymerElement))))
@@ -58,7 +108,27 @@ class AdBlockSubpage extends AdBlockSubpageBase {
       shouldShowCustomFilters_: Boolean,
       shouldShowCustomScriptlets_: Boolean,
       customScriptlets_: Array,
-      developerModePref_: Object
+      developerModePref_: Object,
+      catalogEnabled_: {
+        type: Boolean,
+        value: false
+      },
+      showCatalogDialog_: {
+        type: Boolean,
+        value: false
+      },
+      catalogAddons_: {
+        type: Array,
+        value: () => PLACEHOLDER_CATALOG_ADDONS
+      },
+      catalogSearch_: {
+        type: String,
+        value: ''
+      },
+      catalogCategory_: {
+        type: String,
+        value: ''
+      }
     }
   }
 
@@ -78,6 +148,12 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private declare shouldShowCustomScriptlets_: boolean
   private declare customScriptlets_: Scriptlet[]
   private declare developerModePref_: chrome.settingsPrivate.PrefObject<boolean>
+  // TODO: Persist the catalog on/off state in a pref.
+  private declare catalogEnabled_: boolean
+  private declare showCatalogDialog_: boolean
+  private declare catalogAddons_: CatalogAddon[]
+  private declare catalogSearch_: string
+  private declare catalogCategory_: string
 
   private browserProxy_: BraveAdblockBrowserProxy =
     BraveAdblockBrowserProxyImpl.getInstance()
@@ -85,7 +161,7 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   override connectedCallback() {
     super.connectedCallback()
 
-    this.mirrorPref('brave.ad_block.developer_mode', 'developerModePref_')
+    this.mirrorPref(DEVELOPER_MODE_PREF, 'developerModePref_')
   }
 
   override ready() {
@@ -146,8 +222,75 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   }
 
   private handleTurnOnCatalog_() {
-    // TODO: Implement turning on the add-on catalog.
-    console.log('Turn on catalog clicked')
+    this.showCatalogDialog_ = true
+  }
+
+  private handleCatalogDialogConfirm_() {
+    this.catalogEnabled_ = true
+    this.showCatalogDialog_ = false
+  }
+
+  private handleCatalogDialogCancel_() {
+    this.showCatalogDialog_ = false
+  }
+
+  private handleCatalogLearnMore_() {
+    // TODO: Link to the add-on catalog help page.
+  }
+
+  // The toggle is only shown while the catalog is on, so it only turns it off.
+  // Turning on always goes through the confirmation dialog.
+  private handleCatalogToggle_(detail: {checked: boolean}) {
+    if (!detail.checked) {
+      this.catalogEnabled_ = false
+    }
+  }
+
+  private getCatalogCategories_(addons: CatalogAddon[]) {
+    return [...new Set(addons.map(addon => addon.category))].sort()
+  }
+
+  private filterCatalogAddons_(
+    addons: CatalogAddon[], search: string, category: string) {
+    const query = search.trim().toLowerCase()
+    return addons.filter(addon =>
+      (!category || addon.category === category) &&
+      (!query || [addon.title, addon.author, addon.category]
+        .some(field => field.toLowerCase().includes(query))))
+  }
+
+  private onCatalogSearchInput_(e: Event) {
+    this.catalogSearch_ = (e.target as HTMLInputElement).value
+  }
+
+  private onCatalogCategoryChange_(e: Event) {
+    this.catalogCategory_ = (e.target as HTMLSelectElement).value
+  }
+
+  private getAddonContents_(addon: CatalogAddon) {
+    const parts = []
+    if (addon.rules) {
+      parts.push(`${addon.rules} ${addon.rules === 1 ? 'rule' : 'rules'}`)
+    }
+    if (addon.scriptlets) {
+      parts.push(`${addon.scriptlets} ${
+        addon.scriptlets === 1 ? 'scriptlet' : 'scriptlets'}`)
+    }
+    return parts.join(', ')
+  }
+
+  private addonNeedsDeveloperMode_(addon: CatalogAddon, devMode: boolean) {
+    return addon.scriptlets > 0 && !devMode
+  }
+
+  private handleTurnOnDeveloperMode_(e: Event) {
+    e.preventDefault()
+    PrefService.getInstance().setPrefValue(DEVELOPER_MODE_PREF, true)
+  }
+
+  private handleDownloadAddon_(e: Event&{model: {item: CatalogAddon}}) {
+    // TODO: Download the add-on from the catalog database.
+    console.log('Download add-on clicked', e.model.item.title)
   }
 
   private handlePublishAddon_() {
