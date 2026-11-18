@@ -59,6 +59,22 @@ export interface CatalogAddon {
   scriptlets: CatalogScriptlet[]
 }
 
+export interface PublishAddonRequest {
+  title: string
+  description: string
+  category: string
+  author: string
+  filters: string
+  scriptlets: CatalogScriptlet[]
+}
+
+// Rejection value of publishCatalogAddon. status is 0 if the server wasn't
+// reached.
+export interface PublishAddonError {
+  status?: number
+  error: string
+}
+
 export interface BraveAdblockBrowserProxy {
   getRegionalLists: () => Promise<FilterList[]>
   enableFilterList: (uuid: string, enabled: boolean) => void
@@ -78,6 +94,8 @@ export interface BraveAdblockBrowserProxy {
   removeCustomScriptlet: (name: string) => Promise<ErrorCode>
   // Rejects if the catalog server can't be reached or sends invalid data.
   getCatalogAddons: () => Promise<CatalogAddon[]>
+  // Rejects with a PublishAddonError.
+  publishCatalogAddon: (addon: PublishAddonRequest) => Promise<CatalogAddon>
   addWebUiListener: (eventName: string, callback: Function) => void
 }
 
@@ -161,6 +179,11 @@ export class BraveAdblockBrowserProxyImpl implements BraveAdblockBrowserProxy {
 
   getCatalogAddons () {
     return sendWithPromise<CatalogAddon[]>('brave_adblock.getCatalogAddons')
+  }
+
+  publishCatalogAddon (addon: PublishAddonRequest) {
+    return sendWithPromise<CatalogAddon>(
+      'brave_adblock.publishCatalogAddon', addon)
   }
 
   addWebUiListener (eventName: string, callback: Function) {

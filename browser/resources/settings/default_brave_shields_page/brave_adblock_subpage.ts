@@ -7,6 +7,7 @@ import './components/brave_adblock_editor.js'
 import './components/brave_adblock_scriptlet_list.js'
 import './components/brave_adblock_subscribe_dropdown.js'
 import 'chrome://resources/cr_elements/cr_dialog/cr_dialog.js'
+import 'chrome://resources/cr_elements/cr_textarea/cr_textarea.js'
 import '//resources/cr_elements/md_select.css.js'
 
 import {PrefService} from '/shared/settings/prefs2/pref_service.js'
@@ -26,6 +27,7 @@ import {
   BraveAdblockBrowserProxyImpl,
   CatalogAddon,
   FilterList,
+  PublishAddonError,
   Scriptlet,
   SubscriptionInfo
 } from './brave_adblock_browser_proxy.js'
@@ -37,6 +39,67 @@ import {getTemplate} from './brave_adblock_subpage.html.js'
 import {loadTimeData} from '../i18n_setup.js'
 
 const DEVELOPER_MODE_PREF = 'brave.ad_block.developer_mode'
+
+// Must match the category list in the catalog server's database.
+const CATALOG_CATEGORIES =
+  ['Ads', 'Annoyances', 'Cookie notices', 'Trackers', 'Other']
+
+// TODO: Store the nickname in a pref instead of localStorage.
+const AUTHOR_NICKNAME_STORAGE_KEY = 'braveAddonAuthorNickname'
+
+const NICKNAME_ADJECTIVES =
+  ['quiet', 'swift', 'brave', 'clever', 'gentle', 'sunny', 'calm', 'bold']
+const NICKNAME_ANIMALS =
+  ['otter', 'falcon', 'lynx', 'badger', 'heron', 'fox', 'panda', 'owl']
+
+// Brave stores custom scriptlets as "user-<name>.js".
+const SCRIPTLET_PREFIX = 'user-'
+const SCRIPTLET_SUFFIX = '.js'
+
+interface PublishRule {
+  text: string
+  selected: boolean
+}
+
+interface PublishScriptlet {
+  name: string         // Stored name, e.g. "user-my-addon-fix.js".
+  displayName: string  // Name without "user-" and ".js", e.g. "my-addon-fix".
+  code: string
+  selected: boolean
+}
+
+function getScriptletDisplayName(name: string) {
+  let displayName = name
+  if (displayName.toLowerCase().startsWith(SCRIPTLET_PREFIX)) {
+    displayName = displayName.slice(SCRIPTLET_PREFIX.length)
+  }
+  if (displayName.toLowerCase().endsWith(SCRIPTLET_SUFFIX)) {
+    displayName = displayName.slice(0, -SCRIPTLET_SUFFIX.length)
+  }
+  return displayName
+}
+
+// "Add-on A" -> "add-on-a". Scriptlet names must start with this plus "-".
+function getTitleSlug(title: string) {
+  return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function readStoredNickname() {
+  try {
+    return window.localStorage.getItem(AUTHOR_NICKNAME_STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function storeNickname(nickname: string) {
+  try {
+    window.localStorage.setItem(AUTHOR_NICKNAME_STORAGE_KEY, nickname)
+  } catch {
+    // Not remembering the nickname is fine.
+  }
+}
 
 const AdBlockSubpageBase = SettingsViewMixin(
   PrefServiceObserverMixin(I18nMixin(BaseMixin(PolymerElement))))
@@ -88,6 +151,67 @@ class AdBlockSubpage extends AdBlockSubpageBase {
       catalogCategory_: {
         type: String,
         value: ''
+      },
+      showPublishForm_: {
+        type: Boolean,
+        value: false
+      },
+      publishTitle_: {
+        type: String,
+        value: ''
+      },
+      publishDescription_: {
+        type: String,
+        value: ''
+      },
+      publishCategory_: {
+        type: String,
+        value: 'Annoyances'
+      },
+      publishAuthor_: {
+        type: String,
+        value: ''
+      },
+      publishRules_: {
+        type: Array,
+        value: () => []
+      },
+      publishExtraFilters_: {
+        type: String,
+        value: ''
+      },
+      showPublishConfirm_: {
+        type: Boolean,
+        value: false
+      },
+      publishConfirmRuleCount_: {
+        type: Number,
+        value: 0
+      },
+      publishConfirmScriptletCount_: {
+        type: Number,
+        value: 0
+      },
+      publishScriptlets_: {
+        type: Array,
+        value: () => []
+      },
+      // '' (idle), 'publishing' or 'failed'.
+      publishState_: {
+        type: String,
+        value: ''
+      },
+      publishError_: {
+        type: String,
+        value: ''
+      },
+      publishedTitle_: {
+        type: String,
+        value: ''
+      },
+      catalogCategories_: {
+        type: Array,
+        value: () => CATALOG_CATEGORIES
       }
     }
   }
@@ -116,6 +240,21 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private declare catalogLoadState_: string
   private declare catalogSearch_: string
   private declare catalogCategory_: string
+  private declare showPublishForm_: boolean
+  private declare publishTitle_: string
+  private declare publishDescription_: string
+  private declare publishCategory_: string
+  private declare publishAuthor_: string
+  private declare publishRules_: PublishRule[]
+  private declare publishExtraFilters_: string
+  private declare showPublishConfirm_: boolean
+  private declare publishConfirmRuleCount_: number
+  private declare publishConfirmScriptletCount_: number
+  private declare publishScriptlets_: PublishScriptlet[]
+  private declare publishState_: string
+  private declare publishError_: string
+  private declare publishedTitle_: string
+  private declare catalogCategories_: string[]
 
   private browserProxy_: BraveAdblockBrowserProxy =
     BraveAdblockBrowserProxyImpl.getInstance()
@@ -280,8 +419,156 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   }
 
   private handlePublishAddon_() {
-    // TODO: Implement publishing an add-on.
-    console.log('Publish new add-on clicked')
+    // Every rule and scriptlet starts selected; the user unticks what they
+    // don't want to share.
+    this.publishRules_ = (this.customFilters_ ?? '').split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('!'))
+      .map(text => ({text, selected: true}))
+    this.publishScriptlets_ = (this.customScriptlets_ ?? []).map(s => ({
+      name: s.name,
+      displayName: getScriptletDisplayName(s.name),
+      code: s.content,
+      selected: true,
+    }))
+    this.publishTitle_ = ''
+    this.publishDescription_ = ''
+    this.publishCategory_ = 'Annoyances'
+    this.publishAuthor_ = readStoredNickname()
+    this.publishState_ = ''
+    this.publishError_ = ''
+    this.publishedTitle_ = ''
+    this.publishExtraFilters_ = ''
+    this.showPublishConfirm_ = false
+    this.showPublishForm_ = true
+  }
+
+  private handlePublishCancel_() {
+    this.showPublishForm_ = false
+  }
+
+  private handleSuggestNickname_() {
+    const pick = (list: string[]) =>
+      list[Math.floor(Math.random() * list.length)]
+    const number = Math.floor(Math.random() * 90) + 10
+    this.publishAuthor_ =
+      `${pick(NICKNAME_ADJECTIVES)}-${pick(NICKNAME_ANIMALS)}-${number}`
+  }
+
+  private onPublishCategoryChange_(e: Event) {
+    this.publishCategory_ = (e.target as HTMLSelectElement).value
+  }
+
+  private isPublishTitleTaken_(title: string, addons: CatalogAddon[]) {
+    const normalized = title.trim().toLowerCase()
+    return !!normalized &&
+      addons.some(addon => addon.title.toLowerCase() === normalized)
+  }
+
+  private getTitleSlug_(title: string) {
+    return getTitleSlug(title)
+  }
+
+  private isScriptletNameOk_(scriptlet: PublishScriptlet, title: string) {
+    const slug = getTitleSlug(title)
+    return !!slug &&
+      /^[A-Za-z0-9_-]+$/.test(scriptlet.displayName) &&
+      scriptlet.displayName.toLowerCase().startsWith(`${slug}-`)
+  }
+
+  private getScriptletNameError_(scriptlet: PublishScriptlet, title: string) {
+    const slug = getTitleSlug(title)
+    if (!slug) {
+      return 'Enter a title to check this name.'
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(scriptlet.displayName)) {
+      return 'Use only letters, numbers, "-" and "_". Rename it to publish.'
+    }
+    return `Name must start with "${slug}-". Rename it to publish.`
+  }
+
+  // Rules picked from custom filters plus the ones typed for this add-on,
+  // without blank lines or "!" comments.
+  private getSelectedRules_() {
+    const extraRules = (this.publishExtraFilters_ ?? '').split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('!'))
+    return [
+      ...this.publishRules_.filter(rule => rule.selected).map(rule => rule.text),
+      ...extraRules,
+    ]
+  }
+
+  private getSelectedScriptlets_() {
+    return this.publishScriptlets_.filter(scriptlet =>
+      scriptlet.selected && this.isScriptletNameOk_(scriptlet, this.publishTitle_))
+  }
+
+  // The unused arguments make Polymer recompute when any of them change.
+  private getSelectedRuleCount_(_rules: unknown) {
+    return this.publishRules_.filter(rule => rule.selected).length
+  }
+
+  private getCountLabel_(count: number, singular: string, plural: string) {
+    return `${count} ${count === 1 ? singular : plural}`
+  }
+
+  private canPublish_(
+    title: string, author: string, category: string, _rules: unknown,
+    _scriptlets: unknown, _extraFilters: string, addons: CatalogAddon[],
+    state: string) {
+    return !!title.trim() && !!author.trim() && !!category &&
+      !this.isPublishTitleTaken_(title, addons) &&
+      state !== 'publishing' &&
+      (this.getSelectedRules_().length > 0 ||
+       this.getSelectedScriptlets_().length > 0)
+  }
+
+  private getPublishConfirmLabel_(state: string) {
+    return state === 'publishing' ? 'Publishing…' : 'Publish'
+  }
+
+  // Shows the confirmation dialog with what will be sent.
+  private handlePublishContinue_() {
+    this.publishConfirmRuleCount_ = this.getSelectedRules_().length
+    this.publishConfirmScriptletCount_ = this.getSelectedScriptlets_().length
+    this.publishError_ = ''
+    this.publishState_ = ''
+    this.showPublishConfirm_ = true
+  }
+
+  private handlePublishConfirmCancel_() {
+    if (this.publishState_ === 'publishing') {
+      return
+    }
+    this.showPublishConfirm_ = false
+  }
+
+  private handlePublishConfirm_() {
+    const title = this.publishTitle_.trim()
+    const author = this.publishAuthor_.trim()
+    this.publishState_ = 'publishing'
+    this.browserProxy_.publishCatalogAddon({
+      title,
+      author,
+      description: this.publishDescription_.trim(),
+      category: this.publishCategory_,
+      filters: this.getSelectedRules_().join('\n'),
+      scriptlets: this.getSelectedScriptlets_()
+        .map(s => ({name: s.name, code: s.code})),
+    }).then(() => {
+      storeNickname(author)
+      this.publishState_ = ''
+      this.showPublishConfirm_ = false
+      this.showPublishForm_ = false
+      this.publishedTitle_ = title
+      this.loadCatalog_()
+    }, (error: PublishAddonError) => {
+      // Back to the form, which shows the error.
+      this.publishState_ = 'failed'
+      this.publishError_ = error?.error || 'Publishing failed.'
+      this.showPublishConfirm_ = false
+    })
   }
 
   private handleShowList_() {

@@ -304,6 +304,145 @@
     flex: 0 0 auto;
   }
 
+  .publish-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--leo-spacing-s);
+    margin-bottom: var(--leo-spacing-xl);
+  }
+
+  .publish-label {
+    font: var(--leo-font-small-semibold);
+    color: var(--leo-color-text-primary);
+  }
+
+  .publish-title-input {
+    max-width: 420px;
+  }
+
+  .publish-row {
+    display: flex;
+    gap: var(--leo-spacing-2xl);
+    align-items: flex-start;
+  }
+
+  .publish-author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+  }
+
+  .publish-hint {
+    font: var(--leo-font-x-small-regular);
+    color: var(--leo-color-text-secondary);
+    margin-top: var(--leo-spacing-s);
+  }
+
+  .publish-section-title {
+    font: var(--leo-font-default-semibold);
+    color: var(--leo-color-text-primary);
+    margin-bottom: var(--leo-spacing-m);
+  }
+
+  .publish-group-header {
+    padding: var(--leo-spacing-m) var(--leo-spacing-l);
+    border-radius: var(--leo-radius-m);
+    background: var(--leo-color-container-highlight);
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-text-primary);
+    margin: var(--leo-spacing-m) 0;
+  }
+
+  .publish-extra-filters {
+    margin-top: var(--leo-spacing-m);
+  }
+
+  .publish-filter-textarea {
+    --cr-input-font-family: monospace;
+  }
+
+  .publish-confirm-list {
+    padding-inline-start: var(--leo-spacing-xl);
+    margin: var(--leo-spacing-m) 0;
+  }
+
+  .publish-confirm-list li {
+    margin-bottom: var(--leo-spacing-s);
+  }
+
+  .publish-confirm-not-sent {
+    font: var(--leo-font-default-semibold);
+    color: var(--leo-color-systemfeedback-success-text);
+    margin: var(--leo-spacing-xl) 0;
+  }
+
+  .publish-confirm-warning {
+    padding: var(--leo-spacing-l) var(--leo-spacing-xl);
+    border-radius: var(--leo-radius-m);
+    background: var(--leo-color-systemfeedback-warning-background);
+    color: var(--leo-color-systemfeedback-warning-text);
+    font: var(--leo-font-small-regular);
+  }
+
+  .publish-confirm-note {
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-text-secondary);
+    margin-top: var(--leo-spacing-xl);
+  }
+
+  .publish-rule-list {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .publish-rule {
+    display: flex;
+    padding: var(--leo-spacing-s) var(--leo-spacing-l);
+  }
+
+  .publish-rule code {
+    font: var(--leo-font-monospace-small);
+    word-break: break-all;
+  }
+
+  .publish-scriptlet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: var(--leo-spacing-xl);
+    align-items: center;
+    padding: var(--leo-spacing-m) var(--leo-spacing-l);
+    font: var(--leo-font-small-regular);
+  }
+
+  .publish-scriptlet-invalid {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+    --leo-icon-color: var(--leo-color-systemfeedback-error-icon);
+  }
+
+  .publish-name-ok {
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-systemfeedback-success-text);
+  }
+
+  .publish-name-error {
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-systemfeedback-error-text);
+  }
+
+  .publish-success {
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-systemfeedback-success-text);
+    margin-bottom: var(--leo-spacing-xl);
+  }
+
+  .publish-actions {
+    display: flex;
+    gap: var(--leo-spacing-m);
+    margin: var(--leo-spacing-xl) 0;
+  }
+
   .my-addons-row {
     display: flex;
     flex: 1 1 auto;
@@ -663,18 +802,212 @@
 <!-- TODO: Replace my add-ons text with localized strings. -->
 <template is="dom-if" if="[[developerModePref_.value]]" restamp>
   <div class="settings-box">
-    <div class="my-addons-row">
-      <div class="flex">
-        <div class="label shields-primary-title">My add-ons</div>
-        <div class="label secondary shields-secondary-title">
-          Publish your filters and scriptlets as an add-on for others to download.<br>
-          Turn on the catalog to publish.
+    <div class="flex">
+    <template is="dom-if" if="[[!showPublishForm_]]" restamp>
+      <div class="my-addons-row">
+        <div class="flex">
+          <div class="label shields-primary-title">My add-ons</div>
+          <div class="label secondary shields-secondary-title">
+            Publish your filters and scriptlets as an add-on for others to download.<br>
+            Turn on the catalog to publish.
+          </div>
+        </div>
+        <leo-button isDisabled$="[[!catalogEnabled_]]"
+            on-click="handlePublishAddon_">
+          Publish new add-on
+        </leo-button>
+      </div>
+      <template is="dom-if" if="[[publishedTitle_]]">
+        <div class="publish-success">
+          Published "[[publishedTitle_]]" to the catalog.
+        </div>
+      </template>
+    </template>
+
+    <template is="dom-if" if="[[showPublishForm_]]" restamp>
+      <div class="label shields-primary-title">Publish as add-on</div>
+      <div class="label secondary shields-secondary-title">
+        Your custom filters and scriptlets will be shared publicly in the
+        catalog.
+      </div>
+
+      <div class="publish-field">
+        <label class="publish-label" for="publishTitle">
+          Title (must be unique)
+        </label>
+        <cr-input id="publishTitle" class="publish-title-input"
+            value="{{publishTitle_}}" maxlength="100"
+            invalid="[[isPublishTitleTaken_(publishTitle_, catalogAddons_)]]"
+            error-message="This title is already used in the catalog.">
+        </cr-input>
+      </div>
+
+      <div class="publish-field">
+        <label class="publish-label" for="publishDescription">
+          Description
+        </label>
+        <cr-textarea id="publishDescription" value="{{publishDescription_}}"
+            placeholder="What does it block, and on which sites?" rows="2">
+        </cr-textarea>
+      </div>
+
+      <div class="publish-row">
+        <div class="publish-field">
+          <label class="publish-label" for="publishCategory">Category</label>
+          <select id="publishCategory" class="md-select"
+              on-change="onPublishCategoryChange_">
+            <template is="dom-repeat" items="[[catalogCategories_]]">
+              <option value="[[item]]"
+                  selected="[[isEqual_(item, publishCategory_)]]">
+                [[item]]
+              </option>
+            </template>
+          </select>
+        </div>
+        <div class="publish-field flex">
+          <label class="publish-label" for="publishAuthor">
+            Author nickname
+          </label>
+          <div class="publish-author-row">
+            <cr-input id="publishAuthor" class="flex" maxlength="40"
+                value="{{publishAuthor_}}">
+            </cr-input>
+            <leo-button kind="outline" on-click="handleSuggestNickname_">
+              Suggest one
+            </leo-button>
+          </div>
+          <div class="publish-hint">
+            Not your real name. Pick any nickname, or use a suggested one.<br>
+            Brave remembers it on this device and suggests it for your next
+            add-on.
+          </div>
         </div>
       </div>
-      <leo-button isDisabled$="[[!catalogEnabled_]]"
-          on-click="handlePublishAddon_">
-        Publish new add-on
-      </leo-button>
+
+      <div class="publish-section-title">
+        What will be included in this add-on
+      </div>
+
+      <div class="publish-group-header">
+        Filter rules from your custom filters:
+        [[getSelectedRuleCount_(publishRules_.*)]] of [[publishRules_.length]]
+        selected
+      </div>
+      <template is="dom-if" if="[[!publishRules_.length]]">
+        <div class="publish-hint">You have no custom filters.</div>
+      </template>
+      <div class="publish-rule-list">
+        <template is="dom-repeat" items="[[publishRules_]]">
+          <cr-checkbox class="publish-rule" checked="{{item.selected}}">
+            <code>[[item.text]]</code>
+          </cr-checkbox>
+        </template>
+      </div>
+
+      <div class="publish-field publish-extra-filters">
+        <label class="publish-label" for="publishExtraFilters">
+          Filter rules for this add-on
+        </label>
+        <cr-textarea id="publishExtraFilters" class="publish-filter-textarea"
+            value="{{publishExtraFilters_}}" rows="4" spellcheck="false"
+            placeholder="One rule per line, e.g. example.com##.newsletter-popup">
+        </cr-textarea>
+        <div class="publish-hint">
+          Added to the rules you selected above. Only shared in this add-on,
+          not added to your own custom filters.
+        </div>
+      </div>
+
+      <div class="publish-group-header">Scriptlets</div>
+      <template is="dom-if" if="[[!publishScriptlets_.length]]">
+        <div class="publish-hint">You have no custom scriptlets.</div>
+      </template>
+      <template is="dom-repeat" items="[[publishScriptlets_]]">
+        <div class="publish-scriptlet">
+          <cr-checkbox checked="{{item.selected}}"
+              hidden$="[[!isScriptletNameOk_(item, publishTitle_)]]">
+            [[item.displayName]]
+          </cr-checkbox>
+          <span class="publish-scriptlet-invalid"
+              hidden$="[[isScriptletNameOk_(item, publishTitle_)]]">
+            <leo-icon name="warning-circle-filled"></leo-icon>
+            [[item.displayName]]
+          </span>
+          <span class="publish-name-ok"
+              hidden$="[[!isScriptletNameOk_(item, publishTitle_)]]">
+            Name OK
+          </span>
+          <span class="publish-name-error"
+              hidden$="[[isScriptletNameOk_(item, publishTitle_)]]">
+            [[getScriptletNameError_(item, publishTitle_)]]
+          </span>
+        </div>
+      </template>
+      <div class="publish-hint">
+        Brave adds "user-" to scriptlet names on your device. This check
+        ignores it.
+      </div>
+
+      <template is="dom-if" if="[[isEqual_(publishState_, 'failed')]]">
+        <div class="publish-name-error" role="alert">[[publishError_]]</div>
+      </template>
+
+      <div class="publish-actions">
+        <leo-button on-click="handlePublishContinue_"
+            isDisabled$="[[!canPublish_(publishTitle_, publishAuthor_, publishCategory_, publishRules_.*, publishScriptlets_.*, publishExtraFilters_, catalogAddons_, publishState_)]]">
+          Continue
+        </leo-button>
+        <leo-button kind="outline" on-click="handlePublishCancel_">
+          Cancel
+        </leo-button>
+      </div>
+
+      <template is="dom-if" if="[[showPublishConfirm_]]" restamp>
+        <cr-dialog show-on-attach on-close="handlePublishConfirmCancel_"
+            no-cancel="[[isEqual_(publishState_, 'publishing')]]">
+          <div slot="title">Publish "[[publishTitle_]]" publicly?</div>
+          <div slot="body" class="addon-catalog-dialog-body">
+            <div>
+              This will be sent to the catalog server and shown to everyone:
+            </div>
+            <ul class="publish-confirm-list">
+              <li>Title, description and category</li>
+              <li>Author: @[[publishAuthor_]]</li>
+              <template is="dom-if" if="[[publishConfirmRuleCount_]]">
+                <li>[[getCountLabel_(publishConfirmRuleCount_, 'filter rule', 'filter rules')]]</li>
+              </template>
+              <template is="dom-if" if="[[publishConfirmScriptletCount_]]">
+                <li>
+                  [[getCountLabel_(publishConfirmScriptletCount_, 'scriptlet', 'scriptlets')]],
+                  including their code
+                </li>
+              </template>
+            </ul>
+            <div class="publish-confirm-not-sent">
+              Not sent: your browsing data, your other filters, your real name.
+            </div>
+            <div class="publish-confirm-warning">
+              Filter rules and scriptlets can contain private details, such as
+              the names of sites you use. Check them before publishing.
+            </div>
+            <div class="publish-confirm-note">
+              You can delete the add-on later, but people may already have
+              downloaded a copy.
+            </div>
+          </div>
+          <div slot="button-container" class="addon-catalog-dialog-buttons">
+            <leo-button on-click="handlePublishConfirm_"
+                isDisabled$="[[isEqual_(publishState_, 'publishing')]]">
+              [[getPublishConfirmLabel_(publishState_)]]
+            </leo-button>
+            <leo-button kind="outline" on-click="handlePublishConfirmCancel_"
+                isDisabled$="[[isEqual_(publishState_, 'publishing')]]">
+              Cancel
+            </leo-button>
+          </div>
+        </cr-dialog>
+      </template>
+    </template>
     </div>
   </div>
 </template>
