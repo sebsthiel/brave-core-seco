@@ -24,6 +24,7 @@ import {BaseMixin} from '../base_mixin.js'
 import {
   BraveAdblockBrowserProxy,
   BraveAdblockBrowserProxyImpl,
+  CatalogAddon,
   FilterList,
   Scriptlet,
   SubscriptionInfo
@@ -36,51 +37,6 @@ import {getTemplate} from './brave_adblock_subpage.html.js'
 import {loadTimeData} from '../i18n_setup.js'
 
 const DEVELOPER_MODE_PREF = 'brave.ad_block.developer_mode'
-
-interface CatalogAddon {
-  title: string
-  description: string
-  author: string
-  category: string
-  rules: number
-  scriptlets: number
-  published: string
-  updated: string
-}
-
-// TODO: Fetch add-ons from the catalog database instead of placeholder data.
-const PLACEHOLDER_CATALOG_ADDONS: CatalogAddon[] = [
-  {
-    title: '[Add-on A]',
-    description: '[Short description]',
-    author: '@[nickname]',
-    category: 'Annoyances',
-    rules: 3,
-    scriptlets: 2,
-    published: '[date]',
-    updated: '[date]',
-  },
-  {
-    title: '[Add-on B]',
-    description: '[Short description]',
-    author: '@[nickname]',
-    category: 'Cookie notices',
-    rules: 12,
-    scriptlets: 0,
-    published: '[date]',
-    updated: '[date]',
-  },
-  {
-    title: '[Add-on C]',
-    description: '[Short description]',
-    author: '@[nickname]',
-    category: 'Ads',
-    rules: 0,
-    scriptlets: 4,
-    published: '[date]',
-    updated: '[date]',
-  },
-]
 
 const AdBlockSubpageBase = SettingsViewMixin(
   PrefServiceObserverMixin(I18nMixin(BaseMixin(PolymerElement))))
@@ -119,7 +75,11 @@ class AdBlockSubpage extends AdBlockSubpageBase {
       },
       catalogAddons_: {
         type: Array,
-        value: () => PLACEHOLDER_CATALOG_ADDONS
+        value: () => []
+      },
+      catalogLoadState_: {
+        type: String,
+        value: ''
       },
       catalogSearch_: {
         type: String,
@@ -152,6 +112,8 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private declare catalogEnabled_: boolean
   private declare showCatalogDialog_: boolean
   private declare catalogAddons_: CatalogAddon[]
+  // '' (not loaded), 'loading', 'loaded' or 'failed'.
+  private declare catalogLoadState_: string
   private declare catalogSearch_: string
   private declare catalogCategory_: string
 
@@ -228,6 +190,20 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private handleCatalogDialogConfirm_() {
     this.catalogEnabled_ = true
     this.showCatalogDialog_ = false
+    this.loadCatalog_()
+  }
+
+  // Only called after the user has turned the catalog on, so nothing is sent
+  // to the catalog server before that.
+  private loadCatalog_() {
+    this.catalogLoadState_ = 'loading'
+    this.browserProxy_.getCatalogAddons().then(addons => {
+      this.catalogAddons_ = addons
+      this.catalogLoadState_ = 'loaded'
+    }, () => {
+      this.catalogAddons_ = []
+      this.catalogLoadState_ = 'failed'
+    })
   }
 
   private handleCatalogDialogCancel_() {
@@ -243,6 +219,8 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private handleCatalogToggle_(detail: {checked: boolean}) {
     if (!detail.checked) {
       this.catalogEnabled_ = false
+      this.catalogAddons_ = []
+      this.catalogLoadState_ = ''
     }
   }
 
@@ -268,19 +246,27 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   }
 
   private getAddonContents_(addon: CatalogAddon) {
+    // Count non-empty lines that aren't adblock comments ("!").
+    const rules = addon.filters.split('\n')
+      .filter(line => line.trim() && !line.trim().startsWith('!')).length
+    const scriptlets = addon.scriptlets.length
     const parts = []
-    if (addon.rules) {
-      parts.push(`${addon.rules} ${addon.rules === 1 ? 'rule' : 'rules'}`)
+    if (rules) {
+      parts.push(`${rules} ${rules === 1 ? 'rule' : 'rules'}`)
     }
-    if (addon.scriptlets) {
-      parts.push(`${addon.scriptlets} ${
-        addon.scriptlets === 1 ? 'scriptlet' : 'scriptlets'}`)
+    if (scriptlets) {
+      parts.push(`${scriptlets} ${scriptlets === 1 ? 'scriptlet' : 'scriptlets'}`)
     }
     return parts.join(', ')
   }
 
+  private formatCatalogDate_(isoDate: string) {
+    const date = new Date(isoDate)
+    return isNaN(date.getTime()) ? '' : date.toLocaleDateString()
+  }
+
   private addonNeedsDeveloperMode_(addon: CatalogAddon, devMode: boolean) {
-    return addon.scriptlets > 0 && !devMode
+    return addon.scriptlets.length > 0 && !devMode
   }
 
   private handleTurnOnDeveloperMode_(e: Event) {

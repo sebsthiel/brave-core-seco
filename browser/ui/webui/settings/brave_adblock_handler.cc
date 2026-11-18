@@ -10,9 +10,12 @@
 
 #include "base/check.h"
 #include "base/check_op.h"
+#include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
+#include "base/json/json_reader.h"
 #include "base/json/values_util.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "brave/browser/brave_browser_process.h"
 #include "brave/components/brave_adblock/resources/grit/brave_adblock_generated_map.h"
@@ -26,8 +29,105 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
 #include "chrome/browser/ui/singleton_tabs.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_ui.h"
+#include "net/traffic_annotation/network_traffic_annotation.h"
+#include "services/network/public/cpp/header_util.h"
+#include "services/network/public/cpp/resource_request.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "services/network/public/cpp/simple_url_loader.h"
+#include "services/network/public/mojom/url_response_head.mojom.h"
 #include "ui/base/l10n/time_format.h"
+#include "url/gurl.h"
+
+namespace {
+
+// Test catalog server from brave-seco/addon-catalog. Override with
+// --addon-catalog-url=<url>.
+// TODO: Replace with the real catalog server URL.
+constexpr char kDefaultCatalogUrl[] = "http://localhost:3000/addons";
+constexpr char kCatalogUrlSwitch[] = "addon-catalog-url";
+constexpr size_t kMaxCatalogBytes = 5 * 1024 * 1024;
+constexpr base::TimeDelta kCatalogTimeout = base::Seconds(10);
+
+constexpr auto kCatalogTrafficAnnotation =
+    net::DefineNetworkTrafficAnnotation("brave_adblock_addon_catalog", R"(
+      semantics {
+        sender: "Brave Shields add-on catalog"
+        description:
+          "Downloads the whole catalog of user-made add-ons (filters and "
+          "scriptlets) so the user can browse it in settings."
+        trigger:
+          "The user turns on the add-on catalog in Shields settings, or opens "
+          "the content filters page while it is on."
+        data:
+          "No user data is sent. The server sees the user's IP address."
+        destination: OTHER
+      }
+      policy {
+        cookies_allowed: NO
+        setting:
+          "Turn the add-on catalog off in Shields content filter settings."
+      }
+    )");
+
+GURL GetCatalogUrl() {
+  const auto* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(kCatalogUrlSwitch)) {
+    return GURL(command_line->GetSwitchValueASCII(kCatalogUrlSwitch));
+  }
+  return GURL(kDefaultCatalogUrl);
+}
+
+// Copies only the expected fields from the server's response, so the page
+// never sees unexpected data. Returns nullopt if a required field is missing.
+std::optional<base::DictValue> SanitizeCatalogAddon(const base::Value& value) {
+  const base::DictValue* addon = value.GetIfDict();
+  if (!addon) {
+    return std::nullopt;
+  }
+
+  const std::optional<int> id = addon->FindInt("id");
+  const std::string* title = addon->FindString("title");
+  const std::string* author = addon->FindString("author");
+  const std::string* category = addon->FindString("category");
+  if (!id || !title || !author || !category) {
+    return std::nullopt;
+  }
+
+  base::DictValue result;
+  result.Set("id", *id);
+  result.Set("title", *title);
+  result.Set("author", *author);
+  result.Set("category", *category);
+  for (const char* key :
+       {"description", "filters", "published_at", "updated_at"}) {
+    const std::string* field = addon->FindString(key);
+    result.Set(key, field ? *field : std::string());
+  }
+  result.Set("version", addon->FindInt("version").value_or(1));
+
+  base::ListValue scriptlets;
+  if (const base::ListValue* list = addon->FindList("scriptlets")) {
+    for (const base::Value& item : *list) {
+      const base::DictValue* scriptlet = item.GetIfDict();
+      if (!scriptlet) {
+        continue;
+      }
+      const std::string* name = scriptlet->FindString("name");
+      const std::string* code = scriptlet->FindString("code");
+      if (!name || !code) {
+        continue;
+      }
+      scriptlets.Append(
+          base::DictValue().Set("name", *name).Set("code", *code));
+    }
+  }
+  result.Set("scriptlets", std::move(scriptlets));
+  return result;
+}
+
+}  // namespace
 
 BraveAdBlockHandler::BraveAdBlockHandler() = default;
 
@@ -107,6 +207,11 @@ void BraveAdBlockHandler::RegisterMessages() {
   web_ui()->RegisterMessageCallback(
       "brave_adblock.removeCustomScriptlet",
       base::BindRepeating(&BraveAdBlockHandler::RemoveCustomScriptlet,
+                          base::Unretained(this)));
+
+  web_ui()->RegisterMessageCallback(
+      "brave_adblock.getCatalogAddons",
+      base::BindRepeating(&BraveAdBlockHandler::GetCatalogAddons,
                           base::Unretained(this)));
   pref_change_registrar_.Init(g_browser_process->local_state());
 }
@@ -365,6 +470,62 @@ void BraveAdBlockHandler::OnScriptletUpdateStatus(
   AllowJavascript();
   ResolveJavascriptCallback(callback_id,
                             base::Value(static_cast<int>(error_code)));
+}
+
+void BraveAdBlockHandler::GetCatalogAddons(const base::ListValue& args) {
+  CHECK(args.size() == 1u && args[0].is_string());
+  AllowJavascript();
+
+  auto request = std::make_unique<network::ResourceRequest>();
+  request->url = GetCatalogUrl();
+  request->method = "GET";
+  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+  request->referrer_policy = net::ReferrerPolicy::NO_REFERRER;
+
+  auto url_loader = network::SimpleURLLoader::Create(
+      std::move(request), kCatalogTrafficAnnotation);
+  url_loader->SetTimeoutDuration(kCatalogTimeout);
+
+  auto url_loader_factory = Profile::FromWebUI(web_ui())
+                                ->GetDefaultStoragePartition()
+                                ->GetURLLoaderFactoryForBrowserProcess();
+
+  auto* url_loader_ptr = url_loader.get();
+  url_loader_ptr->DownloadToString(
+      url_loader_factory.get(),
+      base::BindOnce(&BraveAdBlockHandler::OnCatalogAddonsDownloaded,
+                     weak_factory_.GetWeakPtr(), args[0].GetString(),
+                     std::move(url_loader)),
+      kMaxCatalogBytes);
+}
+
+void BraveAdBlockHandler::OnCatalogAddonsDownloaded(
+    std::string callback_id,
+    std::unique_ptr<network::SimpleURLLoader> url_loader,
+    std::optional<std::string> body) {
+  if (!IsJavascriptAllowed()) {
+    return;
+  }
+
+  const auto* response_info = url_loader->ResponseInfo();
+  const bool succeeded = body && response_info && response_info->headers &&
+                         network::IsSuccessfulStatus(
+                             response_info->headers->response_code());
+  std::optional<base::ListValue> json =
+      succeeded ? base::JSONReader::ReadList(*body, base::JSON_PARSE_RFC)
+                : std::nullopt;
+  if (!json) {
+    RejectJavascriptCallback(base::Value(callback_id), base::Value());
+    return;
+  }
+
+  base::ListValue addons;
+  for (const base::Value& item : *json) {
+    if (auto addon = SanitizeCatalogAddon(item)) {
+      addons.Append(std::move(*addon));
+    }
+  }
+  ResolveJavascriptCallback(base::Value(callback_id), addons);
 }
 
 void BraveAdBlockHandler::RefreshSubscriptionsList() {

@@ -264,6 +264,15 @@
     justify-self: end;
   }
 
+  .addon-catalog-message {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+    padding: var(--leo-spacing-xl) 0;
+    font: var(--leo-font-default-regular);
+    color: var(--leo-color-text-secondary);
+  }
+
   .addon-catalog-footnote {
     font: var(--leo-font-small-regular);
     color: var(--leo-color-text-secondary);
@@ -426,6 +435,21 @@
             </template>
           </select>
         </div>
+        <template is="dom-if" if="[[isEqual_(catalogLoadState_, 'loading')]]">
+          <div class="addon-catalog-message">
+            <leo-progressring></leo-progressring>
+            <span>Loading catalog…</span>
+          </div>
+        </template>
+        <template is="dom-if" if="[[isEqual_(catalogLoadState_, 'failed')]]">
+          <div class="addon-catalog-message">
+            <span>Couldn't reach the catalog server.</span>
+            <leo-button kind="outline" size="small" on-click="loadCatalog_">
+              Try again
+            </leo-button>
+          </div>
+        </template>
+        <template is="dom-if" if="[[isEqual_(catalogLoadState_, 'loaded')]]">
         <div class="addon-catalog-table" role="table">
           <div class="addon-catalog-row header" role="row">
             <span role="columnheader">Title</span>
@@ -455,8 +479,8 @@
                   </div>
                 </template>
               </div>
-              <span role="cell">[[item.published]]</span>
-              <span role="cell">[[item.updated]]</span>
+              <span role="cell">[[formatCatalogDate_(item.published_at)]]</span>
+              <span role="cell">[[formatCatalogDate_(item.updated_at)]]</span>
               <div role="cell" class="addon-action">
                 <leo-button size="small"
                     isDisabled$="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]"
@@ -467,6 +491,10 @@
             </div>
           </template>
         </div>
+        <template is="dom-if" if="[[!catalogAddons_.length]]">
+          <div class="addon-catalog-message">No add-ons in the catalog yet.</div>
+        </template>
+        </template>
         <div class="addon-catalog-footnote">
           Add-ons with scriptlets can be downloaded only when Developer mode is
           on. Rules-only add-ons do not need it.

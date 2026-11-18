@@ -41,6 +41,24 @@ export enum ErrorCode {
   kNotFound,
 }
 
+export interface CatalogScriptlet {
+  name: string
+  code: string
+}
+
+export interface CatalogAddon {
+  id: number
+  title: string
+  description: string
+  author: string
+  category: string
+  filters: string
+  version: number
+  published_at: string
+  updated_at: string
+  scriptlets: CatalogScriptlet[]
+}
+
 export interface BraveAdblockBrowserProxy {
   getRegionalLists: () => Promise<FilterList[]>
   enableFilterList: (uuid: string, enabled: boolean) => void
@@ -58,6 +76,8 @@ export interface BraveAdblockBrowserProxy {
   updateCustomScriptlet: (name: string, scriptlet: Scriptlet) =>
     Promise<ErrorCode>
   removeCustomScriptlet: (name: string) => Promise<ErrorCode>
+  // Rejects if the catalog server can't be reached or sends invalid data.
+  getCatalogAddons: () => Promise<CatalogAddon[]>
   addWebUiListener: (eventName: string, callback: Function) => void
 }
 
@@ -137,6 +157,10 @@ export class BraveAdblockBrowserProxyImpl implements BraveAdblockBrowserProxy {
 
   removeCustomScriptlet (name: string) {
     return sendWithPromise<ErrorCode>('brave_adblock.removeCustomScriptlet', name)
+  }
+
+  getCatalogAddons () {
+    return sendWithPromise<CatalogAddon[]>('brave_adblock.getCatalogAddons')
   }
 
   addWebUiListener (eventName: string, callback: Function) {

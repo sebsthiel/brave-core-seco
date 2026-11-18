@@ -6,6 +6,8 @@
 #ifndef BRAVE_BROWSER_UI_WEBUI_SETTINGS_BRAVE_ADBLOCK_HANDLER_H_
 #define BRAVE_BROWSER_UI_WEBUI_SETTINGS_BRAVE_ADBLOCK_HANDLER_H_
 
+#include <memory>
+#include <optional>
 #include <string>
 
 #include "base/memory/weak_ptr.h"
@@ -17,6 +19,10 @@
 #include "components/prefs/pref_change_registrar.h"
 
 class Profile;
+
+namespace network {
+class SimpleURLLoader;
+}  // namespace network
 
 class BraveAdBlockHandler
     : public settings::SettingsPageUIHandler,
@@ -61,6 +67,12 @@ class BraveAdBlockHandler
   void OnScriptletUpdateStatus(
       const std::string& callback_id,
       brave_shields::AdBlockCustomResourceProvider::ErrorCode error_code);
+
+  void GetCatalogAddons(const base::ListValue& args);
+  void OnCatalogAddonsDownloaded(
+      std::string callback_id,
+      std::unique_ptr<network::SimpleURLLoader> url_loader,
+      std::optional<std::string> body);
 
   void RefreshSubscriptionsList();
   void RefreshCustomFilters();
