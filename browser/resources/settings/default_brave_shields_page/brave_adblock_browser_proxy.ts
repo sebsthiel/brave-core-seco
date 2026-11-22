@@ -54,6 +54,7 @@ export interface CatalogAddon {
   category: string
   filters: string
   version: number
+  downloads: number
   published_at: string
   updated_at: string
   scriptlets: CatalogScriptlet[]
@@ -68,8 +69,8 @@ export interface PublishAddonRequest {
   scriptlets: CatalogScriptlet[]
 }
 
-// Rejection value of publishCatalogAddon. status is 0 if the server wasn't
-// reached.
+// Rejection value of publishCatalogAddon / deleteCatalogAddon. status is 0 if
+// the server wasn't reached.
 export interface PublishAddonError {
   status?: number
   error: string
@@ -96,6 +97,10 @@ export interface BraveAdblockBrowserProxy {
   getCatalogAddons: () => Promise<CatalogAddon[]>
   // Rejects with a PublishAddonError.
   publishCatalogAddon: (addon: PublishAddonRequest) => Promise<CatalogAddon>
+  // Rejects with a PublishAddonError.
+  deleteCatalogAddon: (id: number) => Promise<boolean>
+  // Resolves with the updated download count.
+  recordCatalogAddonDownload: (id: number) => Promise<number>
   addWebUiListener: (eventName: string, callback: Function) => void
 }
 
@@ -186,6 +191,15 @@ export class BraveAdblockBrowserProxyImpl implements BraveAdblockBrowserProxy {
       'brave_adblock.publishCatalogAddon', addon)
   }
 
+  deleteCatalogAddon (id: number) {
+    return sendWithPromise<boolean>('brave_adblock.deleteCatalogAddon', id)
+  }
+
+  recordCatalogAddonDownload (id: number) {
+    return sendWithPromise<number>(
+      'brave_adblock.recordCatalogAddonDownload', id)
+  }
+
   addWebUiListener (eventName: string, callback: Function) {
     addWebUiListener(eventName, callback)
   }
@@ -199,7 +213,7 @@ export class BraveAdblockBrowserProxyImpl implements BraveAdblockBrowserProxy {
       binaryString += String.fromCharCode(...chunk)
     }
     const base64String = btoa(binaryString)
-    // Replace with uint8Array.toBase64() when TypeScript adds support for 
+    // Replace with uint8Array.toBase64() when TypeScript adds support for
     // toBase64 method.
     return base64String
   }

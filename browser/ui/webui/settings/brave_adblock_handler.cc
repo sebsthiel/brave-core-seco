@@ -7,6 +7,7 @@
 
 #include <string>
 #include <utility>
+#include <string_view>
 
 #include "base/check.h"
 #include "base/check_op.h"
@@ -16,6 +17,7 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "brave/browser/brave_browser_process.h"
@@ -102,6 +104,58 @@ GURL GetCatalogUrl() {
   return GURL(kDefaultCatalogUrl);
 }
 
+constexpr auto kDeleteTrafficAnnotation =
+    net::DefineNetworkTrafficAnnotation("brave_adblock_addon_delete", R"(
+      semantics {
+        sender: "Brave Shields add-on catalog"
+        description:
+          "Deletes an add-on the user previously published to the catalog."
+        trigger:
+          "The user clicks Delete on one of their published add-ons in "
+          "Shields content filter settings."
+        data:
+          "The add-on ID. The server sees the user's IP address."
+        destination: OTHER
+      }
+      policy {
+        cookies_allowed: NO
+        setting:
+          "Only sent when the user deletes a published add-on."
+      }
+    )");
+
+constexpr auto kDownloadCountTrafficAnnotation =
+    net::DefineNetworkTrafficAnnotation("brave_adblock_addon_download_count", R"(
+      semantics {
+        sender: "Brave Shields add-on catalog"
+        description:
+          "Notifies the catalog server that an add-on was downloaded so its "
+          "download counter can be incremented."
+        trigger:
+          "The user clicks Download on an add-on in Shields content filter "
+          "settings."
+        data:
+          "The add-on ID. The server sees the user's IP address."
+        destination: OTHER
+      }
+      policy {
+        cookies_allowed: NO
+        setting:
+          "Only sent when the user downloads an add-on from the catalog."
+      }
+    )");
+
+GURL GetCatalogAddonUrl(int id, std::string_view suffix = "") {
+  std::string spec = GetCatalogUrl().spec();
+  while (!spec.empty() && spec.back() == '/') {
+    spec.pop_back();
+  }
+  spec += "/";
+  spec += base::NumberToString(id);
+  spec += suffix;
+  return GURL(spec);
+}
+
 // Copies only the expected fields from the server's response, so the page
 // never sees unexpected data. Returns nullopt if a required field is missing.
 std::optional<base::DictValue> SanitizeCatalogAddon(const base::Value& value) {
@@ -129,6 +183,7 @@ std::optional<base::DictValue> SanitizeCatalogAddon(const base::Value& value) {
     result.Set(key, field ? *field : std::string());
   }
   result.Set("version", addon->FindInt("version").value_or(1));
+  result.Set("downloads", addon->FindInt("downloads").value_or(0));
 
   base::ListValue scriptlets;
   if (const base::ListValue* list = addon->FindList("scriptlets")) {
@@ -274,6 +329,16 @@ void BraveAdBlockHandler::RegisterMessages() {
       base::BindRepeating(&BraveAdBlockHandler::PublishCatalogAddon,
                           base::Unretained(this)));
   pref_change_registrar_.Init(g_browser_process->local_state());
+
+  web_ui()->RegisterMessageCallback(
+      "brave_adblock.deleteCatalogAddon",
+      base::BindRepeating(&BraveAdBlockHandler::DeleteCatalogAddon,
+                          base::Unretained(this)));
+
+  web_ui()->RegisterMessageCallback(
+      "brave_adblock.recordCatalogAddonDownload",
+      base::BindRepeating(&BraveAdBlockHandler::RecordCatalogAddonDownload,
+                          base::Unretained(this)));
 }
 
 void BraveAdBlockHandler::OnJavascriptAllowed() {
@@ -661,6 +726,133 @@ void BraveAdBlockHandler::OnCatalogAddonPublished(
           .Set("status", response_code)
           .Set("error", server_error ? *server_error
                                      : "Couldn't reach the catalog server"));
+}
+
+void BraveAdBlockHandler::DeleteCatalogAddon(const base::ListValue& args) {
+  CHECK(args.size() == 2u && args[0].is_string() && args[1].is_int());
+  AllowJavascript();
+
+  const std::string callback_id = args[0].GetString();
+  const int addon_id = args[1].GetInt();
+  if (addon_id <= 0) {
+    RejectJavascriptCallback(
+        base::Value(callback_id),
+        base::DictValue().Set("error", "Invalid add-on ID"));
+    return;
+  }
+
+  auto request = std::make_unique<network::ResourceRequest>();
+  request->url = GetCatalogAddonUrl(addon_id);
+  request->method = "DELETE";
+  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+  request->referrer_policy = net::ReferrerPolicy::NO_REFERRER;
+
+  auto url_loader = network::SimpleURLLoader::Create(
+      std::move(request), kDeleteTrafficAnnotation);
+  url_loader->SetTimeoutDuration(kCatalogTimeout);
+  url_loader->SetAllowHttpErrorResults(true);
+
+  auto url_loader_factory = Profile::FromWebUI(web_ui())
+                                ->GetDefaultStoragePartition()
+                                ->GetURLLoaderFactoryForBrowserProcess();
+
+  auto* url_loader_ptr = url_loader.get();
+  url_loader_ptr->DownloadToString(
+      url_loader_factory.get(),
+      base::BindOnce(&BraveAdBlockHandler::OnCatalogAddonDeleted,
+                     weak_factory_.GetWeakPtr(), callback_id,
+                     std::move(url_loader)),
+      kMaxCatalogBytes);
+}
+
+void BraveAdBlockHandler::OnCatalogAddonDeleted(
+    std::string callback_id,
+    std::unique_ptr<network::SimpleURLLoader> url_loader,
+    std::optional<std::string> body) {
+  if (!IsJavascriptAllowed()) {
+    return;
+  }
+
+  const auto* response_info = url_loader->ResponseInfo();
+  const int response_code = response_info && response_info->headers
+                                ? response_info->headers->response_code()
+                                : 0;
+  if (network::IsSuccessfulStatus(response_code)) {
+    ResolveJavascriptCallback(base::Value(callback_id), base::Value(true));
+    return;
+  }
+
+  std::optional<base::DictValue> json =
+      body ? base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC)
+           : std::nullopt;
+  const std::string* server_error = json ? json->FindString("error") : nullptr;
+  RejectJavascriptCallback(
+      base::Value(callback_id),
+      base::DictValue()
+          .Set("status", response_code)
+          .Set("error", server_error ? *server_error
+                                     : "Couldn't reach the catalog server"));
+}
+
+void BraveAdBlockHandler::RecordCatalogAddonDownload(
+    const base::ListValue& args) {
+  CHECK(args.size() == 2u && args[0].is_string() && args[1].is_int());
+  AllowJavascript();
+
+  const std::string callback_id = args[0].GetString();
+  const int addon_id = args[1].GetInt();
+  if (addon_id <= 0) {
+    RejectJavascriptCallback(base::Value(callback_id), base::Value());
+    return;
+  }
+
+  auto request = std::make_unique<network::ResourceRequest>();
+  request->url = GetCatalogAddonUrl(addon_id, "/download");
+  request->method = "POST";
+  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+  request->referrer_policy = net::ReferrerPolicy::NO_REFERRER;
+
+  auto url_loader = network::SimpleURLLoader::Create(
+      std::move(request), kDownloadCountTrafficAnnotation);
+  url_loader->AttachStringForUpload("", "application/json");
+  url_loader->SetTimeoutDuration(kCatalogTimeout);
+
+  auto url_loader_factory = Profile::FromWebUI(web_ui())
+                                ->GetDefaultStoragePartition()
+                                ->GetURLLoaderFactoryForBrowserProcess();
+
+  auto* url_loader_ptr = url_loader.get();
+  url_loader_ptr->DownloadToString(
+      url_loader_factory.get(),
+      base::BindOnce(&BraveAdBlockHandler::OnCatalogAddonDownloadRecorded,
+                     weak_factory_.GetWeakPtr(), callback_id,
+                     std::move(url_loader)),
+      kMaxCatalogBytes);
+}
+
+void BraveAdBlockHandler::OnCatalogAddonDownloadRecorded(
+    std::string callback_id,
+    std::unique_ptr<network::SimpleURLLoader> url_loader,
+    std::optional<std::string> body) {
+  if (!IsJavascriptAllowed()) {
+    return;
+  }
+
+  const auto* response_info = url_loader->ResponseInfo();
+  const bool succeeded = body && response_info && response_info->headers &&
+                         network::IsSuccessfulStatus(
+                             response_info->headers->response_code());
+  std::optional<base::DictValue> json =
+      succeeded ? base::JSONReader::ReadDict(*body, base::JSON_PARSE_RFC)
+                : std::nullopt;
+  const std::optional<int> downloads =
+      json ? json->FindInt("downloads") : std::nullopt;
+  if (!downloads) {
+    RejectJavascriptCallback(base::Value(callback_id), base::Value());
+    return;
+  }
+
+  ResolveJavascriptCallback(base::Value(callback_id), base::Value(*downloads));
 }
 
 void BraveAdBlockHandler::RefreshSubscriptionsList() {

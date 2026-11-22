@@ -78,7 +78,16 @@ class BraveAdBlockHandler
       std::string callback_id,
       std::unique_ptr<network::SimpleURLLoader> url_loader,
       std::optional<std::string> body);
-
+  void DeleteCatalogAddon(const base::ListValue& args);
+  void OnCatalogAddonDeleted(
+      std::string callback_id,
+      std::unique_ptr<network::SimpleURLLoader> url_loader,
+      std::optional<std::string> body);
+  void RecordCatalogAddonDownload(const base::ListValue& args);
+  void OnCatalogAddonDownloadRecorded(
+      std::string callback_id,
+      std::unique_ptr<network::SimpleURLLoader> url_loader,
+      std::optional<std::string> body);
   void RefreshSubscriptionsList();
   void RefreshCustomFilters();
 
