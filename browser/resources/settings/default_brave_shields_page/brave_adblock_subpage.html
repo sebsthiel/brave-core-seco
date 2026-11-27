@@ -207,15 +207,8 @@
     cursor: pointer;
   }
 
-  .addon-catalog-filters {
-    display: flex;
-    align-items: center;
-    gap: var(--leo-spacing-m);
-    margin-bottom: var(--leo-spacing-xl);
-  }
-
   .addon-catalog-search {
-    flex: 1 1 auto;
+    margin-top: var(--leo-spacing-l);
   }
 
   .addon-catalog-search-icon {
@@ -226,28 +219,76 @@
     --iron-icon-fill-color: var(--google-grey-500);
   }
 
+  .addon-catalog-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--leo-spacing-m);
+    margin: var(--leo-spacing-l) 0 var(--leo-spacing-xl);
+  }
+
+  /* Catalog table: Add-ons | Active | Action */
   .addon-catalog-row {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1.4fr 0.9fr 0.9fr 0.8fr auto;
-    gap: var(--leo-spacing-m);
+    grid-template-columns: minmax(0, 1fr) 72px 120px;
+    gap: var(--leo-spacing-l);
     align-items: center;
     padding: var(--leo-spacing-l) 0;
     border-bottom: 1px solid var(--leo-color-divider-subtle);
-    font: var(--leo-font-small-regular);
-    color: var(--leo-color-text-primary);
   }
 
   .addon-catalog-row.header {
+    padding-block: var(--leo-spacing-m);
     font: var(--leo-font-small-semibold);
-    color: var(--leo-color-text-secondary);
+    color: var(--leo-color-text-primary);
   }
 
-  .addon-title-cell {
+  .addon-catalog-row > :not(:first-child) {
+    justify-self: center;
+  }
+
+  /* Title + meta line, shared by catalog and My add-ons rows. */
+  .addon-info {
+    min-width: 0;
+  }
+
+  .addon-info.clickable {
     cursor: pointer;
   }
 
-  .addon-title-cell:hover .addon-title-link {
+  .addon-info.clickable:hover .addon-title {
     text-decoration: underline;
+  }
+
+  .addon-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--leo-spacing-s);
+    margin-top: var(--leo-spacing-xs);
+    font: var(--leo-font-small-regular);
+    color: var(--leo-color-text-secondary);
+  }
+
+  .addon-meta-downloads {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    --leo-icon-size: 14px;
+  }
+
+  .addon-status-label {
+    font: var(--leo-font-small-semibold);
+    color: var(--leo-color-text-primary);
+  }
+
+  /* My add-ons list: Add-on | Action */
+  .addon-list-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--leo-spacing-l);
+    align-items: center;
+    padding: var(--leo-spacing-l) 0;
+    border-bottom: 1px solid var(--leo-color-divider-subtle);
   }
 
   .addon-title-line {
@@ -270,9 +311,6 @@
     font: var(--leo-font-x-small-semibold);
   }
 
-  .addon-desc {
-    color: var(--leo-color-text-secondary);
-  }
 
   .addon-needs-dev-mode {
     font: var(--leo-font-x-small-semibold);
@@ -288,11 +326,6 @@
     justify-self: end;
   }
 
-  .addon-yours-label {
-    font: var(--leo-font-small-semibold);
-    color: var(--leo-color-text-secondary);
-    padding-inline: var(--leo-spacing-l);
-  }
 
   .addon-catalog-expand {
     margin: var(--leo-spacing-l) 0;
@@ -327,10 +360,9 @@
   .addon-detail-back {
     display: inline-flex;
     align-items: center;
-    gap: var(--leo-spacing-s);
-    margin-bottom: var(--leo-spacing-l);
+    gap: var(--leo-spacing-l);
     color: var(--leo-color-text-primary);
-    font: var(--leo-font-default-semibold);
+    font: var(--leo-font-heading-h4);
     cursor: pointer;
     background: none;
     border: none;
@@ -420,50 +452,13 @@
     overflow: auto;
   }
 
-  /* Add-ons on this device (Screen 8) */
-  .installed-addons-row {
-    display: grid;
-    grid-template-columns: 2fr 1.4fr 1fr 0.8fr auto;
-    gap: var(--leo-spacing-m);
-    align-items: center;
-    padding: var(--leo-spacing-l) 0;
-    border-bottom: 1px solid var(--leo-color-divider-subtle);
-    font: var(--leo-font-small-regular);
-    color: var(--leo-color-text-primary);
-  }
-
-  .installed-addons-row.header {
-    font: var(--leo-font-small-semibold);
-    color: var(--leo-color-text-secondary);
-  }
-
-  /* My add-ons table (Screen 7) */
-  .my-addons-header-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--leo-spacing-s);
-  }
-
+  /* My add-ons (Screen 7) */
   .my-addons-publishing-as {
-    font: var(--leo-font-x-small-semibold);
-    color: var(--leo-color-text-secondary);
-  }
-
-  .my-addons-table-row {
-    display: grid;
-    grid-template-columns: 2fr 1.2fr 1fr 1fr 0.9fr auto;
-    gap: var(--leo-spacing-m);
-    align-items: center;
-    padding: var(--leo-spacing-l) 0;
+    margin-top: var(--leo-spacing-l);
+    padding-bottom: var(--leo-spacing-m);
     border-bottom: 1px solid var(--leo-color-divider-subtle);
-    font: var(--leo-font-small-regular);
-    color: var(--leo-color-text-primary);
-  }
-
-  .my-addons-table-row.header {
     font: var(--leo-font-small-semibold);
-    color: var(--leo-color-text-secondary);
+    color: var(--leo-color-text-primary);
   }
 
   cr-dialog [slot="title"] {
@@ -649,9 +644,14 @@
     <div class="settings-box">
       <div class="flex">
         <button class="addon-detail-back" on-click="handleBackToCatalog_">
-          <span>← Add-on catalog</span>
+          <leo-icon name="arrow-left"></leo-icon>
+          <span>Add-on catalog</span>
         </button>
+      </div>
+    </div>
 
+    <div class="settings-box">
+      <div class="flex">
         <div class="addon-detail-header">
           <div class="flex">
             <div class="addon-title-line">
@@ -662,27 +662,39 @@
               </template>
             </div>
             <div class="addon-detail-meta">
-              by [[formatAuthor_(selectedAddon_.author)]] ·
-              [[selectedAddon_.category]]
+              Created by [[formatAuthor_(selectedAddon_.author)]] ·
+              Category [[selectedAddon_.category]]
             </div>
             <div class="addon-detail-desc">[[selectedAddon_.description]]</div>
-            <div class="addon-detail-meta">
-              [[formatDownloads_(selectedAddon_.downloads)]] downloads ·
-              Published [[formatCatalogDate_(selectedAddon_.published_at)]] ·
-              Updated [[formatCatalogDate_(selectedAddon_.updated_at)]]
+            <div class="addon-meta">
+              <span class="addon-meta-downloads">
+                <leo-icon name="download"></leo-icon>
+                [[formatDownloads_(selectedAddon_.downloads)]]
+              </span>
+              <span>·</span>
+              <span>
+                Published [[formatCatalogDate_(selectedAddon_.published_at)]]
+              </span>
+              <span>·</span>
+              <span>
+                Updated [[formatCatalogDate_(selectedAddon_.updated_at)]]
+              </span>
             </div>
           </div>
 
           <div class="addon-detail-cta">
             <template is="dom-if"
                 if="[[isOwnAddon_(selectedAddon_, publishedAddons_)]]">
-              <span class="addon-yours-label">Yours</span>
+              <span class="addon-status-label">Yours</span>
             </template>
             <template is="dom-if"
                 if="[[!isOwnAddon_(selectedAddon_, publishedAddons_)]]">
               <template is="dom-if"
                   if="[[isAddonInstalled_(selectedAddon_, installedAddons_)]]">
-                <leo-button kind="outline" isDisabled>Added</leo-button>
+                <leo-button kind="outline"
+                    on-click="handleRemoveSelectedAddon_">
+                  Remove
+                </leo-button>
               </template>
               <template is="dom-if"
                   if="[[!isAddonInstalled_(selectedAddon_, installedAddons_)]]">
@@ -861,27 +873,27 @@
       <template is="dom-if" if="[[catalogEnabled_]]" restamp>
         <div class="addon-catalog-header">
           <div class="flex">
-            <div class="label shields-primary-title">Add-on catalog</div>
+            <div class="label shields-primary-title">Add-on Catalog</div>
             <div class="label secondary shields-secondary-title">
               Add-ons made by other users. Open one to read its code before
               downloading.
             </div>
           </div>
           <label class="addon-catalog-toggle">
-            <span>Catalog is on</span>
+            <span>Catalog on</span>
             <leo-toggle checked="[[catalogEnabled_]]"
                 on-change="handleCatalogToggle_">
             </leo-toggle>
           </label>
         </div>
+        <cr-input type="search" class="addon-catalog-search"
+            placeholder="Search by title, author or category"
+            value="[[catalogSearch_]]" on-input="onCatalogSearchInput_">
+          <span class="addon-catalog-search-icon" slot="inline-suffix">
+            <iron-icon icon="search"></iron-icon>
+          </span>
+        </cr-input>
         <div class="addon-catalog-filters">
-          <cr-input type="search" class="addon-catalog-search"
-              placeholder="Search by title, author or category"
-              value="[[catalogSearch_]]" on-input="onCatalogSearchInput_">
-            <span class="addon-catalog-search-icon" slot="inline-suffix">
-              <iron-icon icon="search"></iron-icon>
-            </span>
-          </cr-input>
           <select class="md-select" aria-label="Category"
               on-change="onCatalogCategoryChange_">
             <option value="">Category: All</option>
@@ -911,36 +923,46 @@
             </leo-button>
           </div>
         </template>
-        <template is="dom-if" if="[[isEqual_(catalogLoadState_, 'loaded')]]">
-        <div class="addon-catalog-table" role="table">
+        <template is="dom-if"
+            if="[[isCatalogEmpty_(catalogLoadState_, catalogAddons_)]]">
+          <div class="addon-catalog-message">No add-ons in the catalog yet.</div>
+        </template>
+      </template>
+
+      <!-- Catalog add-ons plus add-ons on this device. Shown while the catalog
+           is off too, so downloaded add-ons can still be managed. -->
+      <template is="dom-if" if="[[catalogRows_.length]]">
+        <div role="table">
           <div class="addon-catalog-row header" role="row">
-            <span role="columnheader">Title</span>
-            <span role="columnheader">Author</span>
-            <span role="columnheader">Category</span>
-            <span role="columnheader">Contains</span>
-            <span role="columnheader">Published</span>
-            <span role="columnheader">Updated</span>
-            <span role="columnheader">Downloads</span>
-            <span role="columnheader"></span>
+            <span role="columnheader">Add-ons</span>
+            <span role="columnheader">Active</span>
+            <span role="columnheader">Action</span>
           </div>
-          <template is="dom-repeat"
-              items="[[getVisibleCatalogAddons_(catalogAddons_, catalogSearch_, catalogCategory_, catalogSort_, catalogExpanded_)]]">
+          <template is="dom-repeat" items="[[catalogRows_]]">
             <div class="addon-catalog-row" role="row">
-              <div role="cell" class="addon-title-cell"
+              <div role="cell"
+                  class$="addon-info [[getAddonInfoClass_(item, catalogAddons_)]]"
                   on-click="handleOpenAddonDetail_">
                 <div class="addon-title-line">
-                  <span class="addon-title addon-title-link">[[item.title]]</span>
+                  <span class="addon-title">[[item.title]]</span>
                   <template is="dom-if"
                       if="[[isOwnAddon_(item, publishedAddons_)]]">
                     <span class="addon-badge-yours">Yours</span>
                   </template>
                 </div>
-                <div class="addon-desc">[[item.description]]</div>
-              </div>
-              <span role="cell">[[formatAuthor_(item.author)]]</span>
-              <span role="cell">[[item.category]]</span>
-              <div role="cell">
-                <div>[[getAddonContents_(item)]]</div>
+                <div class="addon-meta">
+                  <span>[[item.category]]</span>
+                  <template is="dom-if" if="[[item.updated_at]]">
+                    <span>· Updated [[formatCatalogDate_(item.updated_at)]]</span>
+                  </template>
+                  <template is="dom-if" if="[[hasDownloadCount_(item)]]">
+                    <span>·</span>
+                    <span class="addon-meta-downloads">
+                      <leo-icon name="download"></leo-icon>
+                      [[formatDownloads_(item.downloads)]]
+                    </span>
+                  </template>
+                </div>
                 <template is="dom-if"
                     if="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]">
                   <div class="addon-needs-dev-mode">
@@ -949,20 +971,27 @@
                   </div>
                 </template>
               </div>
-              <span role="cell">[[formatCatalogDate_(item.published_at)]]</span>
-              <span role="cell">[[formatCatalogDate_(item.updated_at)]]</span>
-              <span role="cell">[[formatDownloads_(item.downloads)]]</span>
-              <div role="cell" class="addon-action">
+
+              <div role="cell">
+                <leo-toggle size="small"
+                    checked="[[isAddonActive_(item, installedAddons_, publishedAddons_)]]"
+                    disabled="[[!canToggleAddon_(item, installedAddons_, developerModePref_.value)]]"
+                    on-change="handleInstalledAddonToggle_">
+                </leo-toggle>
+              </div>
+
+              <div role="cell">
                 <template is="dom-if"
                     if="[[isOwnAddon_(item, publishedAddons_)]]">
-                  <span class="addon-yours-label">Yours</span>
+                  <span class="addon-status-label">Yours</span>
                 </template>
                 <template is="dom-if"
                     if="[[!isOwnAddon_(item, publishedAddons_)]]">
                   <template is="dom-if"
                       if="[[isAddonInstalled_(item, installedAddons_)]]">
-                    <leo-button kind="outline" size="small" isDisabled>
-                      Added
+                    <leo-button kind="outline" size="small"
+                        on-click="handleRemoveInstalledAddon_">
+                      Remove
                     </leo-button>
                   </template>
                   <template is="dom-if"
@@ -979,86 +1008,28 @@
             </div>
           </template>
         </div>
-        <template is="dom-if" if="[[!catalogAddons_.length]]">
-          <div class="addon-catalog-message">No add-ons in the catalog yet.</div>
-        </template>
-        <template is="dom-if"
-            if="[[shouldShowExpandCatalog_(catalogAddons_, catalogSearch_, catalogCategory_, catalogExpanded_)]]">
-          <div class="addon-catalog-expand">
-            <leo-button kind="outline" size="small"
-                on-click="handleShowFullCatalog_">
-              Show full catalog
-            </leo-button>
-          </div>
-        </template>
-        </template>
+      </template>
 
-        <template is="dom-if" if="[[downloadSuccessMessage_]]">
-          <div class="addon-download-banner">[[downloadSuccessMessage_]]</div>
-        </template>
-        <template is="dom-if" if="[[downloadErrorMessage_]]">
-          <div class="publish-name-error" role="alert">
-            [[downloadErrorMessage_]]
-          </div>
-        </template>
+      <template is="dom-if"
+          if="[[shouldShowExpandCatalog_(catalogAddons_, catalogSearch_, catalogCategory_, catalogExpanded_)]]">
+        <div class="addon-catalog-expand">
+          <leo-button kind="outline" size="small"
+              on-click="handleShowFullCatalog_">
+            Show full catalog
+          </leo-button>
+        </div>
+      </template>
 
-        <div class="addon-catalog-footnote">
-          Add-ons with scriptlets can be downloaded only when Developer mode is
-          on. Rules-only add-ons do not need it.
+      <template is="dom-if" if="[[downloadSuccessMessage_]]">
+        <div class="addon-download-banner">[[downloadSuccessMessage_]]</div>
+      </template>
+      <template is="dom-if" if="[[downloadErrorMessage_]]">
+        <div class="publish-name-error" role="alert">
+          [[downloadErrorMessage_]]
         </div>
       </template>
     </div>
   </div>
-
-  <!-- Screen 8: Add-ons on this device -->
-  <template is="dom-if" if="[[installedAddons_.length]]" restamp>
-    <div class="settings-box">
-      <div class="flex">
-        <div class="label shields-primary-title">Add-ons on this device</div>
-        <div class="label secondary shields-secondary-title">
-          Rules from catalog add-ons you added. Turn them off or remove them at
-          any time.
-        </div>
-        <div role="table">
-          <div class="installed-addons-row header" role="row">
-            <span role="columnheader">Title</span>
-            <span role="columnheader">Contains</span>
-            <span role="columnheader">Added</span>
-            <span role="columnheader">Active</span>
-            <span role="columnheader"></span>
-          </div>
-          <template is="dom-repeat" items="[[installedAddons_]]">
-            <div class="installed-addons-row" role="row">
-              <div role="cell" class="addon-title">[[item.title]]</div>
-              <div role="cell">
-                <div>[[getAddonContents_(item)]]</div>
-                <template is="dom-if"
-                    if="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]">
-                  <div class="addon-needs-dev-mode">
-                    Needs Developer mode ·
-                    <a href="#" on-click="handleTurnOnDeveloperMode_">Turn on</a>
-                  </div>
-                </template>
-              </div>
-              <span role="cell">[[formatCatalogDate_(item.addedAt)]]</span>
-              <div role="cell">
-                <leo-toggle checked="[[item.enabled]]"
-                    disabled="[[addonNeedsDeveloperMode_(item, developerModePref_.value)]]"
-                    on-change="handleInstalledAddonToggle_">
-                </leo-toggle>
-              </div>
-              <div role="cell" class="addon-action">
-                <leo-button kind="outline" size="small"
-                    on-click="handleRemoveInstalledAddon_">
-                  Remove
-                </leo-button>
-              </div>
-            </div>
-          </template>
-        </div>
-      </div>
-    </div>
-  </template>
 
   <template is="dom-if" if="[[showCatalogDialog_]]" restamp>
     <cr-dialog show-on-attach on-close="handleCatalogDialogCancel_">
@@ -1218,18 +1189,17 @@
             </div>
           </template>
         </div>
-        <div class="my-addons-header-actions">
-          <leo-button isDisabled$="[[!catalogEnabled_]]"
-              on-click="handlePublishAddon_">
-            Publish new add-on
-          </leo-button>
-          <template is="dom-if" if="[[storedAuthorNickname_]]">
-            <div class="my-addons-publishing-as">
-              Publishing as [[formatAuthor_(storedAuthorNickname_)]]
-            </div>
-          </template>
-        </div>
+        <leo-button isDisabled$="[[!catalogEnabled_]]"
+            on-click="handlePublishAddon_">
+          Publish new add-on
+        </leo-button>
       </div>
+
+      <template is="dom-if" if="[[storedAuthorNickname_]]">
+        <div class="my-addons-publishing-as">
+          Publishing as [[formatAuthor_(storedAuthorNickname_)]]
+        </div>
+      </template>
 
       <template is="dom-if" if="[[publishedTitle_]]">
         <div class="publish-success">
@@ -1242,24 +1212,25 @@
       </template>
 
       <template is="dom-if" if="[[publishedAddons_.length]]">
-        <div role="table">
-          <div class="my-addons-table-row header" role="row">
-            <span role="columnheader">Title</span>
-            <span role="columnheader">Category</span>
-            <span role="columnheader">Published</span>
-            <span role="columnheader">Updated</span>
-            <span role="columnheader">Downloads</span>
-            <span role="columnheader"></span>
-          </div>
+        <div role="list">
           <template is="dom-repeat"
               items="[[getMyAddons_(publishedAddons_, catalogAddons_)]]">
-            <div class="my-addons-table-row" role="row">
-              <span role="cell" class="addon-title">[[item.title]]</span>
-              <span role="cell">[[item.category]]</span>
-              <span role="cell">[[formatCatalogDate_(item.published_at)]]</span>
-              <span role="cell">[[formatCatalogDate_(item.updated_at)]]</span>
-              <span role="cell">[[formatDownloads_(item.downloads)]]</span>
-              <div role="cell" class="addon-action">
+            <div class="addon-list-row" role="listitem">
+              <div class="addon-info">
+                <div class="addon-title">[[item.title]]</div>
+                <div class="addon-meta">
+                  <span>[[item.category]]</span>
+                  <template is="dom-if" if="[[item.updated_at]]">
+                    <span>· Updated [[formatCatalogDate_(item.updated_at)]]</span>
+                  </template>
+                  <span>·</span>
+                  <span class="addon-meta-downloads">
+                    <leo-icon name="download"></leo-icon>
+                    [[formatDownloads_(item.downloads)]]
+                  </span>
+                </div>
+              </div>
+              <div class="addon-action">
                 <leo-button kind="outline" size="small"
                     isDisabled$="[[!catalogEnabled_]]"
                     isLoading$="[[isDeletingAddon_(item, deletingAddonId_)]]"

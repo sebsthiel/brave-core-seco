@@ -94,6 +94,10 @@ interface InstalledAddon {
   installedScriptletNames: string[]
 }
 
+// A row in the catalog table: a catalog add-on, or an add-on on this device
+// that the loaded catalog doesn't list (catalog off, or removed from server).
+type CatalogRow = CatalogAddon | InstalledAddon
+
 interface PublishedAddonRecord {
   id: number
   title: string
@@ -272,6 +276,11 @@ class AdBlockSubpage extends AdBlockSubpageBase {
         type: Boolean,
         value: false
       },
+      catalogRows_: {
+        type: Array,
+        computed: 'computeCatalogRows_(catalogAddons_, installedAddons_, ' +
+            'catalogSearch_, catalogCategory_, catalogSort_, catalogExpanded_)'
+      },
       selectedAddon_: {
         type: Object,
         value: null
@@ -414,6 +423,7 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   private declare catalogCategory_: string
   private declare catalogSort_: string
   private declare catalogExpanded_: boolean
+  private declare catalogRows_: CatalogRow[]
   private declare selectedAddon_: CatalogAddon|null
   private declare showCodeViewer_: boolean
   private declare codeViewerTitle_: string
@@ -628,6 +638,63 @@ class AdBlockSubpage extends AdBlockSubpageBase {
     return filtered.slice(0, CATALOG_PREVIEW_LIMIT)
   }
 
+  private computeCatalogRows_(
+    catalogAddons: CatalogAddon[], installedAddons: InstalledAddon[],
+    search: string, category: string, sort: string,
+    expanded: boolean): CatalogRow[] {
+    const visible = this.getVisibleCatalogAddons_(
+      catalogAddons, search, category, sort, expanded)
+    const query = search.trim().toLowerCase()
+    const listedIds = new Set(visible.map(a => a.id))
+    const catalogIds = new Set(catalogAddons.map(a => a.id))
+    // Keep add-ons on this device visible even when the preview limit, the
+    // catalog being off, or server-side removal hides them.
+    const extra = installedAddons.filter(addon =>
+      !listedIds.has(addon.id) &&
+      (!catalogIds.has(addon.id) || (!query && !category)) &&
+      (!category || addon.category === category) &&
+      (!query || [addon.title, addon.author, addon.category]
+        .some(field => (field ?? '').toLowerCase().includes(query))))
+    return [...visible, ...extra]
+  }
+
+  private isCatalogEmpty_(loadState: string, addons: CatalogAddon[]) {
+    return loadState === 'loaded' && !addons.length
+  }
+
+  private hasDownloadCount_(row: CatalogRow) {
+    return typeof (row as CatalogAddon).downloads === 'number'
+  }
+
+  private getCatalogAddonById_(id: number) {
+    return this.catalogAddons_.find(a => a.id === id) ?? null
+  }
+
+  // Only rows the loaded catalog lists have a detail page.
+  private getAddonInfoClass_(row: CatalogRow, catalogAddons: CatalogAddon[]) {
+    return catalogAddons.some(a => a.id === row.id) ? 'clickable' : ''
+  }
+
+  private getInstalledAddon_(
+    row: {id: number}|null, installedAddons: InstalledAddon[]) {
+    return row ? installedAddons.find(i => i.id === row.id) ?? null : null
+  }
+
+  private isAddonActive_(
+    row: CatalogRow, installedAddons: InstalledAddon[],
+    publishedAddons: PublishedAddonRecord[]) {
+    if (this.isOwnAddon_(row, publishedAddons)) {
+      return true
+    }
+    return !!this.getInstalledAddon_(row, installedAddons)?.enabled
+  }
+
+  private canToggleAddon_(
+    row: CatalogRow, installedAddons: InstalledAddon[], devMode: boolean) {
+    return !!this.getInstalledAddon_(row, installedAddons) &&
+      !this.addonNeedsDeveloperMode_(row, devMode)
+  }
+
   private shouldShowExpandCatalog_(
     addons: CatalogAddon[], search: string, category: string,
     expanded: boolean) {
@@ -704,16 +771,16 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   }
 
   private isOwnAddon_(
-    addon: CatalogAddon|null, publishedAddons: PublishedAddonRecord[]) {
+    addon: {id: number}|null, publishedAddons: PublishedAddonRecord[]) {
     return !!addon && publishedAddons.some(p => p.id === addon.id)
   }
 
   private isAddonInstalled_(
-    addon: CatalogAddon|null, installedAddons: InstalledAddon[]) {
+    addon: {id: number}|null, installedAddons: InstalledAddon[]) {
     return !!addon && installedAddons.some(i => i.id === addon.id)
   }
 
-  private isAddonDownloading_(addon: CatalogAddon|null, downloadingId: number) {
+  private isAddonDownloading_(addon: {id: number}|null, downloadingId: number) {
     return !!addon && addon.id === downloadingId
   }
 
@@ -723,10 +790,14 @@ class AdBlockSubpage extends AdBlockSubpageBase {
     PrefService.getInstance().setPrefValue(DEVELOPER_MODE_PREF, true)
   }
 
-  private handleOpenAddonDetail_(e: DomRepeatEvent<CatalogAddon>) {
+  private handleOpenAddonDetail_(e: DomRepeatEvent<CatalogRow>) {
+    const addon = this.getCatalogAddonById_(e.model.item.id)
+    if (!addon) {
+      return
+    }
     this.downloadSuccessMessage_ = ''
     this.downloadErrorMessage_ = ''
-    this.selectedAddon_ = e.model.item
+    this.selectedAddon_ = addon
   }
 
   private handleBackToCatalog_() {
@@ -898,8 +969,11 @@ class AdBlockSubpage extends AdBlockSubpageBase {
   }
 
   private async handleInstalledAddonToggle_(
-    e: DomRepeatEvent<InstalledAddon> & {detail?: {checked?: boolean}}) {
-    const addon = e.model.item
+    e: DomRepeatEvent<CatalogRow> & {detail?: {checked?: boolean}}) {
+    const addon = this.getInstalledAddon_(e.model.item, this.installedAddons_)
+    if (!addon) {
+      return
+    }
     const nextEnabled = Boolean(
       e.detail?.checked ?? (e as unknown as {checked?: boolean}).checked)
 
@@ -934,8 +1008,24 @@ class AdBlockSubpage extends AdBlockSubpageBase {
     this.syncInstalledAddonFilters_(nextInstalled)
   }
 
-  private async handleRemoveInstalledAddon_(e: DomRepeatEvent<InstalledAddon>) {
-    const addon = e.model.item
+  private handleRemoveInstalledAddon_(e: DomRepeatEvent<CatalogRow>) {
+    e.stopPropagation()
+    this.removeInstalledAddon_(e.model.item.id)
+  }
+
+  private handleRemoveSelectedAddon_() {
+    if (this.selectedAddon_) {
+      this.removeInstalledAddon_(this.selectedAddon_.id)
+    }
+  }
+
+  private async removeInstalledAddon_(id: number) {
+    const addon = this.getInstalledAddon_({id}, this.installedAddons_)
+    if (!addon) {
+      return
+    }
+    this.downloadSuccessMessage_ = ''
+    this.downloadErrorMessage_ = ''
     if (addon.scriptlets?.length) {
       await this.removeAddonScriptlets_(addon)
     }
